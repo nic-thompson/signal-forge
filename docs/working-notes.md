@@ -293,6 +293,24 @@ Phase 5 alert routing needs to know whether an alert has been acknowledged (to d
 
 This entry exists because "finish the alerting layer" naturally tempts a future phase to add a reminder timer to the pipeline — and that single, reasonable-looking addition would be the first wall-clock dependency in the deterministic core. The boundary is worth recording as a decision so it is defended deliberately, not rediscovered after a replay run starts behaving non-reproducibly.
 
+### D-15 — Dashboard projections update per-emission, inside the deterministic path
+
+Dashboard projections (Phase 6) update on every relevant event, not on a
+wall-clock timer or per-window batch. A per-emission fold over the ordered
+event stream is replay-deterministic — it reconstructs the same view on
+replay, the property DeviceRegistry and AcknowledgementRegistry already
+have — whereas wall-clock-batched flushing would not be.
+
+This is the mirror of D-14. There, reminder cadence was fenced *out* of the
+deterministic path because it is inherently wall-clock. Here, projection
+updates are kept *in* the deterministic path because they can be: they are
+a function of the events, not of elapsed time. Same boundary, opposite side.
+
+The cost is write amplification — every event touches the projection store —
+which is DDIA's central materialised-view trade-off (write cost vs read
+freshness). For this platform's scale and the sub-5-second dashboard
+requirement, always-fresh is the right call; the cost is named, not hidden.
+
 ## Known issues
 
 Things we know about and have decided how to handle.
