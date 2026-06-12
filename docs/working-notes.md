@@ -311,6 +311,16 @@ which is DDIA's central materialised-view trade-off (write cost vs read
 freshness). For this platform's scale and the sub-5-second dashboard
 requirement, always-fresh is the right call; the cost is named, not hidden.
 
+### D-16 — OfflineDetector emits a device.online recovery event, revisiting D-7
+
+D-7 established "once per offline transition; recovery clears state silently, no recovery event" — correct for Phase 2, whose only prospective consumer (alert routing) could infer recovery from the absence of further offline detections. Phase 6's OfflineCountProjection cannot: a current offline-count-per-store gauge needs an explicit signal to decrement on, and "absence of further offline events" is not a signal a fold can consume.
+
+So the detector now emits a device.online DetectionEvent (severity INFO) on the offline -> seen transition, mirroring the offline emission's shape and derived identity (derive("detection.device_online", store_id, device_id, source_event.event_id)). A seen -> seen or unseen -> seen transition is not a recovery and emits nothing; an unregistered store at recovery time skips emission, the same contract the offline path follows.
+
+This does not contradict D-7 so much as meet the condition D-7 implicitly waited for: recovery becomes an event when a consumer genuinely needs it as one. The discriminator-pattern schema (D-8) made this a zero-cost upstream change — device.online matches the detection_type pattern constraint, so no contract bump was required, only a new type constant and the emission. This is the D-11 "budget for an upstream PR" turning out unspent, exactly as the Phase 6 plan allowed for.
+
+Relationship to D-10: the same lesson at a different boundary. D-10 said trace a deferred callable's production data path before accepting the deferral; D-16 is what happens when a later phase's consumer needs a signal an earlier phase chose not to emit — caught cleanly because the projection's data path was traced before the projection was built, not after.
+
 ## Known issues
 
 Things we know about and have decided how to handle.
