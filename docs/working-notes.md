@@ -321,6 +321,15 @@ This does not contradict D-7 so much as meet the condition D-7 implicitly waited
 
 Relationship to D-10: the same lesson at a different boundary. D-10 said trace a deferred callable's production data path before accepting the deferral; D-16 is what happens when a later phase's consumer needs a signal an earlier phase chose not to emit — caught cleanly because the projection's data path was traced before the projection was built, not after.
 
+
+### D-17 — Dashboard projections fold via idempotent set membership, not counters
+
+OfflineCountProjection needs a current-offline-count-per-store gauge. The naive fold is an integer counter: increment on device.offline, decrement on device.online. It is wrong. Detections reach a projection over an at-least-once channel — EventBridge re-delivers, and replay re-runs the same event sequence (the reason Phase 5's alert idempotency keys exist, D-14). A duplicated device.offline permanently inflates a counter and the drift never heals.
+
+So the projection holds, per store, the set of currently-offline device ids: device.offline adds the id, device.online discards it, and the gauge is the set's cardinality. Adding a present id is a no-op; discarding an absent id is a no-op. The fold is therefore idempotent under duplicate delivery, and correct under flapping (offline -> online -> offline collapses to cardinality 1) and under a device going offline twice without an intervening recovery. The set is serialised as a sorted JSON array so the persisted bytes are arrival-order-independent; the key is deleted when the set empties, bounding the view to currently-affected stores.
+
+This is the DDIA Chapter 11 materialised-view-over-a-Chapter-9 at-least-once-stream discipline: a fold over an at-least-once stream must be idempotent or the view rots. The principle is not specific to offline counts — the other two Phase 6 projections (active-outage set cardinality, anomaly-rate rolling window) face the same duplicate-delivery condition and inherit the same default: prefer an idempotent set/membership fold over an accumulating counter wherever the input is a redeliverable event. Counters are admissible only where the increment is itself keyed by something that makes redelivery a no-op.
+
 ## Known issues
 
 Things we know about and have decided how to handle.
