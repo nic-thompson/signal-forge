@@ -339,6 +339,15 @@ So the detector now emits a store.recovered DetectionEvent (severity INFO) on th
 
 As with D-16 this was a zero-cost upstream change: the discriminator pattern (D-8) means store.recovered is a new detection_type string matching the existing constraint, not a contract bump — a new type constant and the emission, nothing more. The pattern is now established twice (device.online, store.recovered): a detector's silent-clear becomes an emitted recovery event the moment a current-state consumer needs the transition as a signal. The third detector (AnomalyDetector) will face the same question if and when a projection needs its recovery; the move is the same and cheap.
 
+
+### D-19 — Global current-set projections use key-per-presence, not a single hot key
+
+OfflineCountProjection is a partitioned view: one gauge per store, read by store id. ActiveOutageProjection is the first global view — "which stores are in outage right now, and how many" — and global views invite a tempting layout: one fixed key holding the whole set, read in a single round-trip. Rejected. Every transition would be a read-modify-write on that one key, and under a fleet-wide event many stores transition at once, making it a contention point and, on the DynamoDB backend, a hot partition (DDIA Chapter 6).
+
+So a global current-set is stored as one key per present member under a shared view: store.outage writes the store's key, store.recovered deletes it, the set is keys(view) and its cardinality is the count. Each transition is an independent point write that contends with nothing, and it reuses the exact keys(view)-enumerates-the-set pattern OfflineCountProjection already uses, so partitioned and global projections read consistently. The idempotency property from D-17 carries over unchanged: a point write is last-write-wins (duplicate delivery is a no-op), a delete of an absent key is a no-op.
+
+The cost accepted is that counting the set is a keys(view) enumeration rather than a single read — a bounded scan, since the number of currently-affected members is small even in a bad event. The stored value carries free provenance (the outage's detected_at) rather than a bare sentinel; the fold's own logic only reads presence. The third projection (anomaly rate) faces the same global-view question and inherits this default: prefer key-per-presence over a single accumulating key wherever the view is a current set rather than a per-entity gauge.
+
 ## Known issues
 
 Things we know about and have decided how to handle.
