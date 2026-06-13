@@ -330,6 +330,15 @@ So the projection holds, per store, the set of currently-offline device ids: dev
 
 This is the DDIA Chapter 11 materialised-view-over-a-Chapter-9 at-least-once-stream discipline: a fold over an at-least-once stream must be idempotent or the view rots. The principle is not specific to offline counts — the other two Phase 6 projections (active-outage set cardinality, anomaly-rate rolling window) face the same duplicate-delivery condition and inherit the same default: prefer an idempotent set/membership fold over an accumulating counter wherever the input is a redeliverable event. Counters are admissible only where the increment is itself keyed by something that makes redelivery a no-op.
 
+
+### D-18 — OutageDetector emits a store.recovered event on clear, mirroring D-16
+
+D-7 made the same call for OutageDetector that it made for OfflineDetector: transition into outage emits, transition back to not-outage clears state silently. Correct for Phase 2, whose only consumer (alert routing) could infer recovery from the absence of further outage detections. Phase 6's ActiveOutageProjection cannot: a current-active-outage view needs an explicit signal to remove a store from the active set on, and "absence of further outage events" is not a signal a fold can consume — the identical gap D-16 closed for offline.
+
+So the detector now emits a store.recovered DetectionEvent (severity INFO) on the outage -> not-outage transition. The clear is even cleaner to emit than offline's was: the transition is already a discrete window emission the detector handles and computes everything a recovery event needs (store_id, window bounds, the now-sub-threshold ratio); it simply declined to emit. Identity is derived the same way the outage event's is (derive over store_id and window bounds), so it stays replay-deterministic. A below-threshold emission for a store not in outage is not a recovery and emits nothing — the same "once per transition" contract the outage entry follows.
+
+As with D-16 this was a zero-cost upstream change: the discriminator pattern (D-8) means store.recovered is a new detection_type string matching the existing constraint, not a contract bump — a new type constant and the emission, nothing more. The pattern is now established twice (device.online, store.recovered): a detector's silent-clear becomes an emitted recovery event the moment a current-state consumer needs the transition as a signal. The third detector (AnomalyDetector) will face the same question if and when a projection needs its recovery; the move is the same and cheap.
+
 ## Known issues
 
 Things we know about and have decided how to handle.

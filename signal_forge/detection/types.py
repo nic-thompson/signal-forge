@@ -26,6 +26,7 @@ from typing import Final
 DETECTION_TYPE_DEVICE_OFFLINE: Final[str] = "device.offline"
 DETECTION_TYPE_DEVICE_ONLINE: Final[str] = "device.online"
 DETECTION_TYPE_STORE_OUTAGE: Final[str] = "store.outage"
+DETECTION_TYPE_STORE_RECOVERED: Final[str] = "store.recovered"
 DETECTION_TYPE_SIGNAL_ANOMALY: Final[str] = "signal.anomaly"
 
 
@@ -37,6 +38,7 @@ ALL_DETECTION_TYPES: Final[frozenset[str]] = frozenset(
         DETECTION_TYPE_DEVICE_OFFLINE,
         DETECTION_TYPE_DEVICE_ONLINE,
         DETECTION_TYPE_STORE_OUTAGE,
+        DETECTION_TYPE_STORE_RECOVERED,
         DETECTION_TYPE_SIGNAL_ANOMALY,
     }
 )
