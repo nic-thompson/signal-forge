@@ -354,6 +354,8 @@ Things we know about and have decided how to handle.
 
 ### Active
 
+- **`AnomalyRateProjection` in-memory store grows without bound.** Eviction-(i): the projection's `observe()` is a pure bucketing fold with no prune, by design. Bucket storage is bounded by the backend, not the fold - the DynamoDB store (Phase 6 commit 8) will set a TTL on bucket keys from the retention horizon. The `InMemoryProjectionStore` does not evict, so a long-running non-DynamoDB process accumulates one key per signal per time bucket indefinitely. Acceptable for tests (short-lived) and for the DynamoDB-backed production path; flagged so the TTL is not forgotten when the DynamoDB store lands.
+
 - **`structured-logging-python` emits stdlib-logging warnings during `error()` calls.** Every test run produces four `--- Logging error ---` lines from `tests/streaming/test_observability.py`. Tests pass; the artefact pollutes test output. Pre-existing since Phase 1; deterministic; reproducer is a single 4-line `python3 -c` snippet. Decision pending: fix upstream now (small PR + SHA bump) vs defer to a later cleanup pass.
 
 - **`event-schema-contracts` ruff backlog: 161 warnings, 127 auto-fixable.** Pre-existing on the upstream main branch; not in our new code. Cleanup PR queued for after Phase 2 lands.
