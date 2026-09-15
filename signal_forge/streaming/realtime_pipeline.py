@@ -55,7 +55,6 @@ from event_schema_contracts.base.identity import derive
 from event_schema_contracts.base.metadata import EventMetadata
 from event_schema_contracts.base.trace import TraceContext
 from event_schema_contracts.detection import DetectionEvent
-
 from event_schema_contracts.features import (
     FeatureValue,
     WindowedFeatureVectorEvent,
